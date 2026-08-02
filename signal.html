@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal — AI Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+<style>
+  :root{
+    --bg: #0d0f13;
+    --panel: #14171d;
+    --panel-2: #1a1e26;
+    --line: #262b34;
+    --amber: #e8a33d;
+    --amber-dim: #b47c2c;
+    --amber-glow: rgba(232,163,61,.35);
+    --text: #eceef2;
+    --text-dim: #8a909c;
+    --text-faint: #565c68;
+    --user-bubble: #22262f;
+    --bot-bubble: #14171d;
+    --danger: #e0563f;
+    --ok: #6fbf8a;
+    --radius: 14px;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+ 
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(232,163,61,.05), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(232,163,61,.04), transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+    overflow:hidden;
+  }
+  ::selection{ background:var(--amber-glow); color:#fff; }
+  button{ font-family:inherit; }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+  }
+ 
+  /* ============ SPLASH ============ */
+  .splash{
+    position:fixed; inset:0; background:#08090c;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:1000; transition:opacity .7s ease, transform .7s ease;
+  }
+  .splash.out{ opacity:0; transform:scale(1.04); pointer-events:none; }
+ 
+  .splash-scope{
+    width:220px; height:70px; margin-bottom:34px;
+  }
+  .splash-scope svg{ width:100%; height:100%; overflow:visible; }
+  .scope-line{
+    fill:none; stroke:var(--amber); stroke-width:2; stroke-linecap:round;
+    filter:drop-shadow(0 0 6px var(--amber-glow));
+  }
+ 
+  .splash-title{
+    font-family:var(--font-display); font-weight:700; font-size:2.4rem;
+    letter-spacing:-.02em; color:var(--text);
+    opacity:0; animation:rise .7s .15s ease forwards;
+  }
+  .splash-title span{ color:var(--amber); }
+  .splash-tag{
+    font-family:var(--font-mono); font-size:.82rem; color:var(--text-dim);
+    margin-top:10px; letter-spacing:.04em; text-transform:uppercase;
+    opacity:0; animation:rise .7s .3s ease forwards;
+  }
+  .splash-btn{
+    margin-top:42px; padding:14px 40px; border-radius:999px; border:1px solid var(--amber-dim);
+    background:transparent; color:var(--amber); font-weight:600; font-size:.95rem;
+    letter-spacing:.02em; cursor:pointer; position:relative; overflow:hidden;
+    opacity:0; animation:rise .7s .45s ease forwards;
+    transition:background .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  .splash-btn:hover{ background:var(--amber); color:#12100a; box-shadow:0 0 30px var(--amber-glow); }
+  @keyframes rise{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+ 
+  /* ============ APP SHELL ============ */
+  .app{
+    width:100%; max-width:840px; height:88vh;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:20px;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);
+    opacity:0; transform:translateY(16px) scale(.98);
+    transition:opacity .5s ease .1s, transform .5s ease .1s;
+  }
+  .app.visible{ opacity:1; transform:translateY(0) scale(1); }
+ 
+  /* Header */
+  .app-header{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 18px;
+    background:var(--panel-2);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{ width:9px; height:9px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); animation:blink 2.4s infinite; flex-shrink:0; }
+  .brand-mark.busy{ background:var(--amber); box-shadow:0 0 8px var(--amber); animation:blink .9s infinite; }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .brand-name{ font-family:var(--font-display); font-weight:600; font-size:1.02rem; }
+  .brand-model{ font-family:var(--font-mono); font-size:.72rem; color:var(--text-faint); }
+ 
+  .scope-strip{ flex:1; height:26px; opacity:.8; }
+  .scope-strip svg{ width:100%; height:100%; }
+ 
+  .header-actions{ display:flex; gap:6px; }
+  .icon-btn{
+    width:34px; height:34px; border-radius:10px; border:1px solid transparent;
+    background:transparent; color:var(--text-dim); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:background .2s ease, color .2s ease, border-color .2s ease;
+  }
+  .icon-btn:hover{ background:rgba(255,255,255,.05); color:var(--text); border-color:var(--line); }
+  .icon-btn svg{ width:17px; height:17px; }
+ 
+  /* Messages */
+  .messages{
+    flex:1; overflow-y:auto; padding:22px;
+    display:flex; flex-direction:column; gap:14px;
+    scroll-behavior:smooth;
+  }
+  .messages::-webkit-scrollbar{ width:6px; }
+  .messages::-webkit-scrollbar-thumb{ background:var(--line); border-radius:10px; }
+ 
+  .row{ display:flex; flex-direction:column; max-width:78%; animation:fadeIn .3s ease forwards; }
+  .row.user{ align-self:flex-end; align-items:flex-end; }
+  .row.bot{ align-self:flex-start; align-items:flex-start; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+ 
+  .bubble{
+    padding:12px 16px; border-radius:var(--radius); font-size:.96rem; line-height:1.55;
+    word-wrap:break-word; position:relative;
+  }
+  .row.user .bubble{ background:var(--user-bubble); border:1px solid var(--line); border-bottom-right-radius:4px; }
+  .row.bot .bubble{ background:var(--bot-bubble); border:1px solid var(--line); border-bottom-left-radius:4px; }
+ 
+  .bubble p{ margin:0 0 8px; }
+  .bubble p:last-child{ margin-bottom:0; }
+  .bubble a{ color:var(--amber); }
+  .bubble code{ font-family:var(--font-mono); font-size:.85em; background:rgba(255,255,255,.06); padding:1px 5px; border-radius:4px; }
+  .bubble pre{
+    background:#0a0b0e; border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; overflow-x:auto; margin:8px 0; position:relative;
+  }
+  .bubble pre code{ background:none; padding:0; font-size:.83rem; line-height:1.5; }
+  .bubble ul, .bubble ol{ padding-left:1.3em; margin:6px 0; }
+ 
+  .copy-btn{
+    position:absolute; top:8px; right:8px; font-family:var(--font-mono); font-size:.68rem;
+    color:var(--text-faint); background:rgba(255,255,255,.04); border:1px solid var(--line);
+    border-radius:6px; padding:3px 8px; cursor:pointer; opacity:0; transition:opacity .15s ease, color .15s ease;
+  }
+  .bubble pre:hover .copy-btn{ opacity:1; }
+  .copy-btn:hover{ color:var(--amber); }
+ 
+  .meta{ font-family:var(--font-mono); font-size:.68rem; color:var(--text-faint); margin-top:4px; padding:0 4px; }
+ 
+  .error-bubble{
+    align-self:center; font-size:.84rem; color:var(--danger);
+    background:rgba(224,86,63,.1); border:1px solid rgba(224,86,63,.3);
+    padding:9px 14px; border-radius:10px; font-family:var(--font-mono); max-width:90%;
+  }
+ 
+  .cursor-blink{ display:inline-block; width:2px; height:1em; background:var(--amber); vertical-align:middle; margin-left:2px; animation:blink 1s infinite; }
+ 
+  .empty-state{
+    margin:auto; text-align:center; color:var(--text-faint); font-family:var(--font-mono); font-size:.82rem;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+ 
+  /* Input */
+  .input-area{
+    display:flex; align-items:flex-end; gap:10px;
+    padding:16px 18px; background:var(--panel-2); border-top:1px solid var(--line);
+  }
+  .input-wrap{
+    flex:1; background:var(--bg); border:1px solid var(--line); border-radius:16px;
+    display:flex; align-items:flex-end; padding:6px 8px 6px 16px;
+    transition:border-color .2s ease, box-shadow .2s ease;
+  }
+  .input-wrap:focus-within{ border-color:var(--amber-dim); box-shadow:0 0 0 3px var(--amber-glow); }
+  #user-input{
+    flex:1; background:none; border:none; outline:none; resize:none;
+    color:var(--text); font-family:var(--font-body); font-size:.96rem; line-height:1.5;
+    max-height:150px; padding:9px 0;
+  }
+  #user-input::placeholder{ color:var(--text-faint); }
+ 
+  #send-btn{
+    width:40px; height:40px; border-radius:12px; border:none; flex-shrink:0;
+    background:var(--amber); color:#171308; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .2s ease, transform .1s ease, opacity .2s ease;
+  }
+  #send-btn:hover{ background:#f0b458; }
+  #send-btn:active{ transform:scale(.94); }
+  #send-btn:disabled{ background:var(--line); color:var(--text-faint); cursor:not-allowed; }
+  #send-btn svg{ width:18px; height:18px; }
+  #send-btn.stop{ background:var(--danger); color:#fff; }
+ 
+  /* Settings modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(5,6,8,.7); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; z-index:200;
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  .overlay.visible{ opacity:1; pointer-events:auto; }
+  .modal{
+    width:92%; max-width:420px; background:var(--panel); border:1px solid var(--line);
+    border-radius:18px; padding:26px; transform:translateY(10px); transition:transform .2s ease;
+  }
+  .overlay.visible .modal{ transform:translateY(0); }
+  .modal h2{ font-family:var(--font-display); font-size:1.15rem; margin-bottom:4px; }
+  .modal .sub{ color:var(--text-dim); font-size:.82rem; margin-bottom:20px; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:.78rem; color:var(--text-dim); margin-bottom:6px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.03em; }
+  .field-row{ display:flex; gap:8px; }
+  .field input, .field textarea{
+    width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; color:var(--text); font-size:.9rem; outline:none; font-family:var(--font-body);
+    transition:border-color .2s ease;
+  }
+  .field input:focus, .field textarea:focus{ border-color:var(--amber-dim); }
+  .field textarea{ resize:vertical; min-height:60px; }
+  .field .hint{ font-size:.72rem; color:var(--text-faint); margin-top:5px; }
+  .field .hint a{ color:var(--amber-dim); }
+  .toggle-visibility{
+    background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:0 12px;
+    color:var(--text-dim); cursor:pointer; font-size:.75rem; font-family:var(--font-mono);
+  }
+  .modal-actions{ display:flex; gap:10px; margin-top:22px; }
+  .btn{
+    flex:1; padding:11px; border-radius:10px; border:1px solid var(--line);
+    background:transparent; color:var(--text-dim); font-weight:600; font-size:.85rem; cursor:pointer;
+    transition:all .2s ease;
+  }
+  .btn:hover{ border-color:var(--text-dim); color:var(--text); }
+  .btn.primary{ background:var(--amber); color:#171308; border-color:var(--amber); }
+  .btn.primary:hover{ background:#f0b458; }
+  .btn.danger:hover{ border-color:var(--danger); color:var(--danger); }
+ 
+  @media (max-width:600px){
+    body{ padding:0; }
+    .app{ height:100vh; border-radius:0; max-width:100%; }
+    .row{ max-width:88%; }
+    .splash-title{ font-size:1.9rem; }
+  }
+</style>
+</head>
+<body>
+ 
+<!-- ================= SPLASH ================= -->
+<div class="splash" id="splash">
+  <div class="splash-scope">
+    <svg viewBox="0 0 220 70"><path class="scope-line" id="splash-wave" d="M0,35 L220,35"/></svg>
+  </div>
+  <h1 class="splash-title">Signal<span>.</span></h1>
+  <p class="splash-tag">a conversational instrument</p>
+  <button class="splash-btn" id="start-btn">Open channel</button>
+</div>
+ 
+<!-- ================= APP ================= -->
+<div class="app" id="app">
+  <div class="app-header">
+    <div class="brand">
+      <div class="brand-mark" id="brand-mark"></div>
+      <div>
+        <div class="brand-name">Signal</div>
+        <div class="brand-model" id="model-label">no model configured</div>
+      </div>
+    </div>
+    <div class="scope-strip"><svg viewBox="0 0 300 26" preserveAspectRatio="none"><path class="scope-line" id="header-wave" d="M0,13 L300,13" stroke-width="1.5"/></svg></div>
+    <div class="header-actions">
+      <button class="icon-btn" id="new-chat-btn" title="New chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="icon-btn" id="settings-btn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+ 
+  <div class="messages" id="messages">
+    <div class="empty-state" id="empty-state">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div>no transmissions yet — set your API key in settings, then say something</div>
+    </div>
+  </div>
+ 
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea id="user-input" rows="1" placeholder="Type a message..."></textarea>
+    </div>
+    <button id="send-btn" title="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+    </button>
+  </div>
+</div>
+ 
+<!-- ================= SETTINGS MODAL ================= -->
+<div class="overlay" id="settings-overlay">
+  <div class="modal">
+    <h2>Channel settings</h2>
+    <p class="sub">Stored only in this browser's local storage — never sent anywhere but OpenRouter.</p>
+ 
+    <div class="field">
+      <label for="api-key-input">OpenRouter API key</label>
+      <div class="field-row">
+        <input type="password" id="api-key-input" placeholder="sk-or-v1-...">
+        <button class="toggle-visibility" id="toggle-key-visibility">show</button>
+      </div>
+      <div class="hint">Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>. Revoke old keys if one's ever been exposed.</div>
+    </div>
+ 
+    <div class="field">
+      <label for="model-input">Model ID</label>
+      <input type="text" id="model-input" placeholder="e.g. meta-llama/llama-3.1-8b-instruct:free" list="model-suggestions">
+      <datalist id="model-suggestions">
+        <option value="openrouter/auto">
+        <option value="meta-llama/llama-3.1-8b-instruct:free">
+        <option value="google/gemini-flash-1.5">
+        <option value="mistralai/mistral-7b-instruct:free">
+      </datalist>
+      <div class="hint">Full current catalog + pricing: <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a></div>
+    </div>
+ 
+    <div class="field">
+      <label for="system-prompt-input">System prompt (optional)</label>
+      <textarea id="system-prompt-input" placeholder="You are a helpful assistant..."></textarea>
+    </div>
+ 
+    <div class="modal-actions">
+      <button class="btn danger" id="clear-data-btn">Wipe local data</button>
+      <button class="btn primary" id="save-settings-btn">Save</button>
+    </div>
+  </div>
+</div>
+ 
+<script>
+(function(){
+  "use strict";
+ 
+  /* ---------- refs ---------- */
+  const splash = document.getElementById('splash');
+  const startBtn = document.getElementById('start-btn');
+  const app = document.getElementById('app');
+  const messagesEl = document.getElementById('messages');
+  const emptyState = document.getElementById('empty-state');
+  const input = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  const brandMark = document.getElementById('brand-mark');
+  const modelLabel = document.getElementById('model-label');
+  const newChatBtn = document.getElementById('new-chat-btn');
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsOverlay = document.getElementById('settings-overlay');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const modelInput = document.getElementById('model-input');
+  const systemPromptInput = document.getElementById('system-prompt-input');
+  const saveSettingsBtn = document.getElementById('save-settings-btn');
+  const clearDataBtn = document.getElementById('clear-data-btn');
+  const toggleKeyVisibility = document.getElementById('toggle-key-visibility');
+ 
+  /* ---------- state ---------- */
+  const STORE_KEY = 'signal.state.v1';
+  let state = {
+    apiKey: '',
+    model: 'openrouter/auto',
+    systemPrompt: '',
+    history: []       // {role, content, ts}
+  };
+  let streaming = false;
+  let abortController = null;
+ 
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(raw) Object.assign(state, JSON.parse(raw));
+    }catch(e){ console.warn('Could not load saved state', e); }
+  }
+  function save(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch(e){ console.warn('Could not persist state', e); }
+  }
+ 
+  /* ---------- splash ---------- */
+  let dismissed = false;
+  function dismissSplash(){
+    if(dismissed) return;
+    dismissed = true;
+    splash.classList.add('out');
+    setTimeout(()=>{
+      splash.style.display = 'none';
+      app.classList.add('visible');
+      renderHistory();
+      input.focus();
+    }, 700);
+  }
+  startBtn.addEventListener('click', dismissSplash);
+  setTimeout(()=>{ if(!dismissed) dismissSplash(); }, 4500);
+ 
+  /* ---------- oscilloscope animation ---------- */
+  function animateWave(pathId, opts){
+    const path = document.getElementById(pathId);
+    if(!path) return { setBusy(){} };
+    let t = 0;
+    let busy = false;
+    const w = opts.width, h = opts.height, mid = h/2;
+    function frame(){
+      t += busy ? 0.18 : 0.045;
+      const amp = busy ? mid*0.7 : mid*0.12;
+      let d = `M0,${mid} `;
+      const steps = 40;
+      for(let i=0;i<=steps;i++){
+        const x = (w/steps)*i;
+        const y = mid + Math.sin(t + i*0.5) * amp * Math.sin(i/steps*Math.PI);
+        d += `L${x.toFixed(1)},${y.toFixed(1)} `;
+      }
+      path.setAttribute('d', d);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    return { setBusy(v){ busy = v; } };
+  }
+  const splashWave = animateWave('splash-wave', { width:220, height:70 });
+  splashWave.setBusy(true);
+  const headerWave = animateWave('header-wave', { width:300, height:26 });
+ 
+  /* ---------- textarea autosize ---------- */
+  input.addEventListener('input', ()=>{
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+  });
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      handleSend();
+    }
+  });
+  sendBtn.addEventListener('click', ()=>{
+    if(streaming){ stopStreaming(); } else { handleSend(); }
+  });
+ 
+  /* ---------- rendering ---------- */
+  function fmtTime(ts){
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  }
+ 
+  function renderMarkdown(raw){
+    try{
+      const html = marked.parse(raw, { breaks:true });
+      return DOMPurify.sanitize(html);
+    }catch(e){
+      const div = document.createElement('div');
+      div.textContent = raw;
+      return div.innerHTML;
+    }
+  }
+ 
+  function addCopyButtons(container){
+    container.querySelectorAll('pre').forEach(pre=>{
+      if(pre.querySelector('.copy-btn')) return;
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'copy';
+      btn.addEventListener('click', ()=>{
+        const code = pre.querySelector('code');
+        navigator.clipboard.writeText(code ? code.textContent : pre.textContent).then(()=>{
+          btn.textContent = 'copied';
+          setTimeout(()=> btn.textContent = 'copy', 1200);
+        });
+      });
+      pre.appendChild(btn);
+    });
+  }
+ 
+  function renderHistory(){
+    messagesEl.querySelectorAll('.row, .error-bubble').forEach(n=>n.remove());
+    emptyState.style.display = state.history.length ? 'none' : 'flex';
+    state.history.forEach(msg=> appendRow(msg.role, msg.content, msg.ts, false));
+    scrollToBottom();
+  }
+ 
+  function appendRow(role, content, ts, animate){
+    emptyState.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = 'row ' + (role === 'user' ? 'user' : 'bot');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if(role === 'user'){
+      bubble.textContent = content;
+    } else {
+      bubble.innerHTML = renderMarkdown(content || '');
+      addCopyButtons(bubble);
+    }
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = fmtTime(ts || Date.now());
+    row.appendChild(bubble);
+    row.appendChild(meta);
+    messagesEl.appendChild(row);
+    if(!animate) row.style.animation = 'none';
+    scrollToBottom();
+    return { row, bubble };
+  }
+ 
+  function appendError(text){
+    const div = document.createElement('div');
+    div.className = 'error-bubble';
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    scrollToBottom();
+  }
+ 
+  function scrollToBottom(){
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+ 
+  /* ---------- send / stream ---------- */
+  function setBusy(v){
+    streaming = v;
+    brandMark.classList.toggle('busy', v);
+    headerWave.setBusy(v);
+    sendBtn.classList.toggle('stop', v);
+    sendBtn.innerHTML = v
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>';
+  }
+ 
+  function stopStreaming(){
+    if(abortController) abortController.abort();
+  }
+ 
+  async function handleSend(){
+    const text = input.value.trim();
+    if(!text || streaming) return;
+ 
+    if(!state.apiKey){
+      appendError('No API key set. Open settings and add your OpenRouter key.');
+      openSettings();
+      return;
+    }
+ 
+    input.value = '';
+    input.style.height = 'auto';
+ 
+    const userMsg = { role:'user', content:text, ts:Date.now() };
+    state.history.push(userMsg);
+    appendRow('user', text, userMsg.ts, true);
+    save();
+ 
+    const botTs = Date.now();
+    const { bubble } = appendRow('assistant', '', botTs, true);
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor-blink';
+    bubble.appendChild(cursor);
+ 
+    setBusy(true);
+    abortController = new AbortController();
+ 
+    const payloadMessages = [];
+    if(state.systemPrompt.trim()) payloadMessages.push({ role:'system', content:state.systemPrompt.trim() });
+    state.history.forEach(m=> payloadMessages.push({ role:m.role, content:m.content }));
+ 
+    let fullText = '';
+ 
+    try{
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method:'POST',
+        signal: abortController.signal,
+        headers:{
+          'Authorization': 'Bearer ' + state.apiKey.trim(),
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin || 'http://localhost',
+          'X-Title': 'Signal'
+        },
+        body: JSON.stringify({
+          model: state.model || 'openrouter/auto',
+          messages: payloadMessages,
+          stream: true
+        })
+      });
+ 
+      if(!res.ok || !res.body){
+        const raw = await res.text().catch(()=> '');
+        throw new Error('Status ' + res.status + (raw ? ': ' + raw.slice(0,200) : ''));
+      }
+ 
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+ 
+      while(true){
+        const { done, value } = await reader.read();
+        if(done) break;
+        buf += decoder.decode(value, { stream:true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for(const line of lines){
+          const trimmed = line.trim();
+          if(!trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if(payload === '[DONE]') continue;
+          try{
+            const json = JSON.parse(payload);
+            const delta = json.choices && json.choices[0] && json.choices[0].delta
+              ? json.choices[0].delta.content : '';
+            if(delta){
+              fullText += delta;
+              bubble.innerHTML = renderMarkdown(fullText);
+              bubble.appendChild(cursor);
+              addCopyButtons(bubble);
+              scrollToBottom();
+            }
+          }catch(e){ /* partial chunk, ignore */ }
+        }
+      }
+ 
+      cursor.remove();
+      if(!fullText){ fullText = '(no content returned)'; bubble.innerHTML = renderMarkdown(fullText); }
+      state.history.push({ role:'assistant', content:fullText, ts:botTs });
+      save();
+ 
+    }catch(err){
+      cursor.remove();
+      bubble.closest('.row').remove();
+      if(err.name === 'AbortError'){
+        if(fullText){
+          state.history.push({ role:'assistant', content:fullText + '\n\n*(stopped)*', ts:botTs });
+          appendRow('assistant', fullText + '\n\n*(stopped)*', botTs, false);
+          save();
+        }
+      } else {
+        appendError('Error: ' + err.message);
+      }
+    } finally{
+      setBusy(false);
+      abortController = null;
+      input.focus();
+    }
+  }
+ 
+  /* ---------- settings modal ---------- */
+  function openSettings(){
+    apiKeyInput.value = state.apiKey;
+    modelInput.value = state.model;
+    systemPromptInput.value = state.systemPrompt;
+    settingsOverlay.classList.add('visible');
+  }
+  function closeSettings(){ settingsOverlay.classList.remove('visible'); }
+ 
+  settingsBtn.addEventListener('click', openSettings);
+  settingsOverlay.addEventListener('click', (e)=>{ if(e.target === settingsOverlay) closeSettings(); });
+ 
+  toggleKeyVisibility.addEventListener('click', ()=>{
+    const isPw = apiKeyInput.type === 'password';
+    apiKeyInput.type = isPw ? 'text' : 'password';
+    toggleKeyVisibility.textContent = isPw ? 'hide' : 'show';
+  });
+ 
+  saveSettingsBtn.addEventListener('click', ()=>{
+    state.apiKey = apiKeyInput.value.trim();
+    state.model = modelInput.value.trim() || 'openrouter/auto';
+    state.systemPrompt = systemPromptInput.value;
+    save();
+    updateModelLabel();
+    closeSettings();
+  });
+ 
+  clearDataBtn.addEventListener('click', ()=>{
+    if(!confirm('This clears your saved API key, model, system prompt and chat history from this browser. Continue?')) return;
+    localStorage.removeItem(STORE_KEY);
+    state = { apiKey:'', model:'openrouter/auto', systemPrompt:'', history:[] };
+    renderHistory();
+    updateModelLabel();
+    closeSettings();
+  });
+ 
+  newChatBtn.addEventListener('click', ()=>{
+    if(state.history.length && !confirm('Start a new chat? This clears the current conversation.')) return;
+    state.history = [];
+    save();
+    renderHistory();
+  });
+ 
+  function updateModelLabel(){
+    modelLabel.textContent = state.apiKey ? state.model : 'no model configured';
+  }
+ 
+  /* ---------- init ---------- */
+  load();
+  updateModelLabel();
+  if(marked && marked.setOptions){
+    marked.setOptions({ gfm:true, breaks:true });
+  }
+ 
+})();
+</script>
+</body>
+</html>
