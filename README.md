@@ -42,7 +42,7 @@ authentication and entitlements. This app never bypasses a lock, subscription or
 - Dashboard with quick hub, favorites, shuffleable batch picks and continue-watching
 - All Batches: fuzzy/Hinglish-tolerant search plus exam / class / language filters
 - Batch page: subjects, description, test series & DPP, announcements, daily/weekly schedule
-- Subject → chapters → lectures & notes, with an inline PDF viewer for open attachments
+- Subject → chapters → lectures & notes, with an in-app video player and inline PDF viewer
 - PDF Bank: exam → category browsing over the live study-material tree, plus each exam's public index spreadsheet
 - Khazana: recorded course library per batch programme and subject
 - Favorites, history, saved PDFs and light/dark theme, all stored locally
@@ -51,8 +51,14 @@ authentication and entitlements. This app never bypasses a lock, subscription or
 
 These are upstream restrictions, not missing UI:
 
-- **Lectures** — the API returns `isLocked: true` and no stream URL. "Watch lecture"
-  deep-links into AryaVidya's own player, which resolves the stream with the visitor's access.
+- **Lectures** — the API blanks `videoUrl` / `hls_url` / `video_id`, but YouTube-hosted
+  lectures still carry their public video id inside `videoDetails.image`
+  (`i.ytimg.com/vi/<id>/…`). Those play in-app in a normal YouTube embed. Lectures whose
+  only source is a protected PW stream still open on AryaVidya; no lock, token or DRM is
+  touched. Some older videos were removed by the uploader — YouTube reports that itself.
+- **Expired batch tokens** — upstream answers `401 "Token expired"` for some batches
+  (e.g. `6acc6da838f6f1f44a229f61`). That is authoritative, so the app shows it plainly
+  with a retry and an AryaVidya link instead of retrying into a bot-check page.
 - **Protected attachments** — notes entries return a real title and filename but an empty
   `key`. The row shows the filename and an "Open on AryaVidya" action instead of a dead link.
 - **PDF Bank folders** — `get-child-nodes` is a POST that Cloudflare only answers for

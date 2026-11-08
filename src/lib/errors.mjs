@@ -5,6 +5,9 @@
 export function friendlyError(message) {
   const text = String(message ?? '').trim();
   if (!text) return 'Something went wrong.';
+  if (/token expired|invalid token|token is invalid/i.test(text)) {
+    return "AryaVidya's access token for this batch has expired, so its chapters and lectures can't be listed right now. Retry later, or open the batch on AryaVidya.";
+  }
   if (/<!doctype|<html|<head|just a moment/i.test(text)) {
     return "AryaVidya blocked this request (bot protection). This content can only be opened on AryaVidya itself.";
   }

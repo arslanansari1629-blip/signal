@@ -70,3 +70,50 @@ test('upstream HTML error pages become one readable line', async () => {
   assert.equal(friendlyError(''), 'Something went wrong.');
   assert.ok(friendlyError('x'.repeat(500)).length <= 240);
 });
+
+test('youtube ids are recovered from every field the API populates', async () => {
+  const { youtubeId, watchTarget } = await import('../src/lib/media.mjs');
+  // The real shape: videoUrl/video_id/hls_url empty, id only in the thumbnail.
+  const lecture = {
+    urlType: 'youtube', url: '', isLocked: true,
+    videoDetails: { video_id: '', videoUrl: '', hls_url: '', findKey: '62e10f4a7dc8640018f3dfe6',
+                    image: 'https://i.ytimg.com/vi/nmp4YViMoOo/mqdefault.jpg' }
+  };
+  assert.equal(youtubeId(lecture), 'nmp4YViMoOo');
+  const t = watchTarget(lecture);
+  assert.equal(t.kind, 'youtube');
+  assert.equal(t.embed, 'https://www.youtube-nocookie.com/embed/nmp4YViMoOo?autoplay=1&rel=0&modestbranding=1');
+
+  assert.equal(youtubeId({ videoDetails: { videoUrl: 'https://www.youtube.com/watch?v=ZKvJvep2alY&t=9s' } }), 'ZKvJvep2alY');
+  assert.equal(youtubeId({ url: 'https://youtu.be/_h3oLcYO-kE' }), '_h3oLcYO-kE');
+  assert.equal(youtubeId({ videoDetails: { video_id: 'eVhFJb9U51s' } }), 'eVhFJb9U51s');
+  assert.equal(youtubeId({ videoDetails: { embedCode: '<iframe src="https://www.youtube.com/embed/MMXkBblCVUY"></iframe>' } }), 'MMXkBblCVUY');
+  // A Mongo ObjectId must never be mistaken for a video id.
+  assert.equal(youtubeId({ _id: '62e10f4a7dc8640018f3dfe6', videoDetails: { findKey: '62e10f4a7dc8640018f3dfe6' } }), '');
+  assert.equal(youtubeId({}), '');
+  assert.equal(youtubeId(null), '');
+});
+
+test('protected streams fall back to AryaVidya instead of a broken player', async () => {
+  const { watchTarget } = await import('../src/lib/media.mjs');
+  const locked = { urlType: 'penpencilvdo', url: '', videoDetails: { videoUrl: '', hls_url: '', image: 'https://static.pw.live/x/y.jpg' } };
+  assert.equal(watchTarget(locked).kind, 'external');
+  assert.equal(watchTarget({ videoDetails: { videoUrl: 'https://cdn.example.com/a.mp4' } }).kind, 'file');
+  // HLS needs native support; in node there is no document, so it must not claim playability.
+  assert.equal(watchTarget({ videoDetails: { hls_url: 'https://cdn.example.com/a.m3u8' } }).kind, 'external');
+});
+
+test('entity-escaped links keep their sid parameter', async () => {
+  const { normalizeSearch } = await import('../src/lib/media.mjs');
+  const q = new URLSearchParams(normalizeSearch('name=Notices&amp;sid=6acc79c46866955558c48e05'));
+  assert.equal(q.get('sid'), '6acc79c46866955558c48e05');
+  assert.equal(q.get('name'), 'Notices');
+  assert.equal(new URLSearchParams(normalizeSearch('a=1&#38;b=2')).get('b'), '2');
+  assert.equal(new URLSearchParams(normalizeSearch('a=1&amp;amp;b=2')).get('b'), '2');
+  assert.equal(normalizeSearch('name=Physics&sid=x'), 'name=Physics&sid=x');
+});
+
+test('expired upstream tokens are explained, not shown as a bot check', async () => {
+  const { friendlyError } = await import('../src/lib/errors.mjs');
+  assert.match(friendlyError('Token expired'), /access token for this batch has expired/);
+});

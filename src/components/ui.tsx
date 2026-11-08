@@ -40,13 +40,16 @@ export function Empty({ title, hint, icon }: { title: string; hint?: string; ico
   return <div className="card empty">{icon ?? <Inbox />}<div style={{ fontWeight: 600, color: 'var(--text-2)' }}>{title}</div>{hint && <div className="tiny" style={{ marginTop: 4 }}>{hint}</div>}</div>;
 }
 
-export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorBox({ message, onRetry, href, hrefLabel = 'Open on AryaVidya' }: { message: string; onRetry?: () => void; href?: string; hrefLabel?: string }) {
   const text = friendlyError(message);
   return (
     <div className="card error-box">
       <AlertTriangle />
       <div style={{ fontWeight: 600 }}>{text}</div>
-      {onRetry && <button className="btn" style={{ marginTop: 12 }} onClick={onRetry}>Try again</button>}
+      <div className="row" style={{ marginTop: 12 }}>
+        {onRetry && <button className="btn" onClick={onRetry}>Try again</button>}
+        {href && <a className="btn" href={href} target="_blank" rel="noreferrer">{hrefLabel}</a>}
+      </div>
     </div>
   );
 }

@@ -40,6 +40,9 @@ export async function pw<T>(path: string, signal?: AbortSignal): Promise<T> {
     return await getJson<T>(directUrl(path), signal);
   } catch (err) {
     if (signal?.aborted) throw err;
+    // A 4xx is a real answer from upstream (e.g. 401 "Token expired"). Retrying it
+    // through our proxy only replaces that useful message with a bot-check page.
+    if (err instanceof ApiError && err.status >= 400 && err.status < 500) throw err;
     return getJson<T>(proxyUrl(path), signal);
   }
 }

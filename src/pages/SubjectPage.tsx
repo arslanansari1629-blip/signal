@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, FolderOpen, Search } from 'lucide-react';
-import { api, type Topic } from '../lib/api';
+import { api, referenceBatchLink, type Topic } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { useRoute } from '../lib/router';
 import { Empty, ErrorBox, ListSkeleton } from '../components/ui';
@@ -39,7 +39,7 @@ export function SubjectPage({ batchId, slug }: { batchId: string; slug: string }
       </div>
 
       {loading && <ListSkeleton count={8} />}
-      {error && <ErrorBox message={error} onRetry={reload} />}
+      {error && <ErrorBox message={error} onRetry={reload} href={referenceBatchLink(batchId)} />}
       {!loading && !error && visible.length === 0 && <Empty title="No chapters found" icon={<FolderOpen />} />}
       {!loading && !error && visible.length > 0 && (
         <div className="card">

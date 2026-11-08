@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { ChevronRight, PlayCircle, FileText, Download, ExternalLink, Video, Lock } from 'lucide-react';
+import { ChevronRight, PlayCircle, FileText, Download, ExternalLink, Video, Lock, Youtube } from 'lucide-react';
 import { api, attachmentUrl, playerLink, referenceBatchLink, teacherName, type Content } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { useRoute } from '../lib/router';
 import { Empty, ErrorBox, ListSkeleton, Modal, fmtDate, fmtTime } from '../components/ui';
 import { store } from '../lib/store';
+import { watchTarget } from '../lib/media.mjs';
+import { VideoPlayer } from '../components/VideoPlayer';
 
 export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: string; tag: string }) {
   const route = useRoute();
@@ -14,10 +16,13 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
   const [type, setType] = useState<'videos' | 'notes'>(route.query.get('type') === 'notes' ? 'notes' : 'videos');
   const [page, setPage] = useState(1);
   const [pdf, setPdf] = useState<{ name: string; url: string } | null>(null);
+  const [playing, setPlaying] = useState<{ title: string; target: ReturnType<typeof watchTarget>; href: string } | null>(null);
   const { data, loading, error, reload } = useAsync(
     (signal) => api.contents(batchId, slug, tag, type, page, signal), [batchId, slug, tag, type, page]);
   const items: Content[] = data?.data ?? [];
-  const hasMore = items.length >= 20;
+  const total = data?.paginate?.totalCount ?? items.length;
+  const limit = data?.paginate?.limit ?? 20;
+  const pages = Math.max(1, Math.ceil(total / limit));
 
   const openPdf = (name: string, url: string) => {
     setPdf({ name, url });
@@ -25,9 +30,12 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
   };
 
   const watch = (c: Content) => {
-    const url = playerLink(batchId, subjectId, c);
-    store.visit({ batch_id: batchId, name: `${c.topic || c.videoDetails?.name} — ${subjectName}`, path: `/batch/${batchId}/subject/${slug}/topic/${tag}?name=${encodeURIComponent(subjectName)}&topic=${encodeURIComponent(topicName)}&sid=${subjectId}` });
-    window.open(url, '_blank', 'noopener');
+    const title = c.topic || c.videoDetails?.name || 'Lecture';
+    const href = playerLink(batchId, subjectId, c);
+    store.visit({ batch_id: batchId, name: `${title} — ${subjectName}`, path: `/batch/${batchId}/subject/${slug}/topic/${tag}?name=${encodeURIComponent(subjectName)}&topic=${encodeURIComponent(topicName)}&sid=${subjectId}` });
+    const target = watchTarget(c);
+    if (target.kind === 'external') { window.open(href, '_blank', 'noopener'); return; }
+    setPlaying({ title, target, href });
   };
 
   return (
@@ -41,7 +49,7 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
       <div className="page-head">
         <div>
           <h1 className="page-title">{topicName}</h1>
-          <div className="page-sub">{subjectName} · {loading ? 'loading…' : `${items.length} items on page ${page}`}</div>
+          <div className="page-sub">{subjectName} · {loading ? 'loading…' : `${total} ${type === 'videos' ? 'lectures' : 'notes'} · page ${page} of ${pages}`}</div>
         </div>
       </div>
 
@@ -51,7 +59,7 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
       </div>
 
       {loading && <ListSkeleton count={6} />}
-      {error && <ErrorBox message={error} onRetry={reload} />}
+      {error && <ErrorBox message={error} onRetry={reload} href={referenceBatchLink(batchId)} />}
       {!loading && !error && items.length === 0 && <Empty title={type === 'videos' ? 'No lectures in this chapter' : 'No notes in this chapter'} icon={type === 'videos' ? <Video /> : <FileText />} />}
 
       {!loading && !error && items.length > 0 && (
@@ -71,9 +79,13 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
                       {c.teachers?.length ? ` · ${teacherName(c.teachers[0])}` : ''}
                     </div>
                     <div className="row" style={{ marginTop: 8 }}>
-                      <button className="btn primary" onClick={() => watch(c)}><PlayCircle /> Watch lecture</button>
+                      <button className="btn primary" onClick={() => watch(c)}>
+                        {watchTarget(c).kind === 'external' ? <><ExternalLink /> Open on AryaVidya</> : <><PlayCircle /> Play lecture</>}
+                      </button>
                       {c.hasAttachment && <button className="btn" onClick={() => { setType('notes'); setPage(1); }}><FileText /> Notes</button>}
-                      {c.isLocked && <span className="chip"><Lock size={11} /> Player opens on AryaVidya</span>}
+                      {watchTarget(c).kind === 'youtube'
+                        ? <span className="chip"><Youtube size={11} /> YouTube</span>
+                        : c.isLocked && <span className="chip"><Lock size={11} /> Opens on AryaVidya</span>}
                     </div>
                   </div>
                 </>
@@ -120,12 +132,16 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
         </div>
       )}
 
-      {items.length > 0 && (
+      {items.length > 0 && pages > 1 && (
         <div className="center row" style={{ justifyContent: 'center' }}>
           <button className="btn" disabled={page === 1 || loading} onClick={() => setPage((p) => p - 1)}>Previous</button>
-          <span className="tiny muted">Page {page}</span>
-          <button className="btn" disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>Next</button>
+          <span className="tiny muted">Page {page} of {pages}</span>
+          <button className="btn" disabled={page >= pages || loading} onClick={() => setPage((p) => p + 1)}>Next</button>
         </div>
+      )}
+
+      {playing && (
+        <VideoPlayer title={playing.title} target={playing.target} fallbackHref={playing.href} onClose={() => setPlaying(null)} />
       )}
 
       {pdf && (

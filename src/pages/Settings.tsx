@@ -40,7 +40,7 @@ export function Settings() {
           <p>AryaVidya Study Portal — a fast, keyboard-friendly front end for browsing batches, chapters, lectures, notes, tests and the PDF bank.</p>
           <ul>
             <li>Batch catalog and all course data are fetched live from <code>stream.aryavidya.cc</code> — directly from your browser, with this app's server proxy as a fallback. Nothing is hard-coded or mocked.</li>
-            <li>Lecture playback opens the original AryaVidya player, which handles its own access rules. This app does not bypass any lock or subscription.</li>
+            <li>YouTube-hosted lectures play here in a standard YouTube player. Lectures whose only source is a protected PW stream open on AryaVidya, which applies its own access rules — this app never strips a lock, token or DRM.</li>
             <li>Favorites, history, saved PDFs and theme never leave your browser.</li>
           </ul>
         </div>

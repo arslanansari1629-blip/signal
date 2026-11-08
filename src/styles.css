@@ -160,3 +160,6 @@ input, select { font: inherit; color: inherit; }
 /* Several notes entries can share one dated row. */
 .note-entry + .note-entry { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-2); }
 .note-entry .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* In-app lecture player */
+.video-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--r); background: #000; display: block; }
