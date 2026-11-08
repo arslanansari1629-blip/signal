@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronRight, FileText, Folder, ExternalLink, ArrowLeft } from 'lucide-react';
+import { ChevronRight, FileText, Folder, ExternalLink, ArrowLeft, Download } from 'lucide-react';
 import { api, nodeUrl, type PdfExam, type PdfNode } from '../lib/api';
+import { ORIGIN } from '../lib/upstream';
 import { useAsync } from '../lib/useAsync';
 import { Empty, ErrorBox, ListSkeleton, Modal } from '../components/ui';
 import { store } from '../lib/store';
@@ -57,6 +58,7 @@ export function PdfBank() {
           <div className="page-sub">Mindmaps, short notes, formula sheets, PYQs and NCERT material</div>
         </div>
         <div className="spacer" />
+        {exam?.file && <a className="btn" href={exam.file} target="_blank" rel="noreferrer" title="The public spreadsheet this exam's PDF bank is built from"><Download /> {exam.exam} index</a>}
         {trail.length > 0 && <button className="btn" onClick={() => setTrail((t) => t.slice(0, -1))}><ArrowLeft /> Back</button>}
       </div>
 
@@ -72,7 +74,22 @@ export function PdfBank() {
       )}
 
       {trail.length > 0 && nodes.loading && <ListSkeleton count={6} />}
-      {trail.length > 0 && nodes.error && <ErrorBox message={nodes.error} onRetry={nodes.reload} />}
+      {trail.length > 0 && nodes.error && (
+        <>
+          <ErrorBox message={nodes.error} onRetry={nodes.reload} />
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="list-title">Open “{trail.map((t) => t.name).join(' / ')}” on AryaVidya</div>
+            <div className="tiny muted" style={{ marginTop: 4 }}>
+              Folder listings come from a protected endpoint that only answers requests made on AryaVidya's own site.
+              {exam?.file ? ` The ${exam.exam} index below is the public spreadsheet behind this bank.` : ''}
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <a className="btn primary" href={ORIGIN} target="_blank" rel="noreferrer"><ExternalLink /> Go to AryaVidya</a>
+              {exam?.file && <a className="btn" href={exam.file} target="_blank" rel="noreferrer"><Download /> Download {exam.exam} index</a>}
+            </div>
+          </div>
+        </>
+      )}
       {((trail.length === 0 && !loading && !error) || (trail.length > 0 && !nodes.loading && !nodes.error)) && (
         list.length === 0
           ? <Empty title="Nothing published in this folder yet" icon={<Folder />} />

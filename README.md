@@ -42,10 +42,25 @@ authentication and entitlements. This app never bypasses a lock, subscription or
 - Dashboard with quick hub, favorites, shuffleable batch picks and continue-watching
 - All Batches: fuzzy/Hinglish-tolerant search plus exam / class / language filters
 - Batch page: subjects, description, test series & DPP, announcements, daily/weekly schedule
-- Subject → chapters → lectures & notes, with an inline PDF viewer and download links
-- PDF Bank: exam → category → folder traversal over the live study-material tree
+- Subject → chapters → lectures & notes, with an inline PDF viewer for open attachments
+- PDF Bank: exam → category browsing over the live study-material tree, plus each exam's public index spreadsheet
 - Khazana: recorded course library per batch programme and subject
 - Favorites, history, saved PDFs and light/dark theme, all stored locally
+
+## Known limits (verified against production)
+
+These are upstream restrictions, not missing UI:
+
+- **Lectures** — the API returns `isLocked: true` and no stream URL. "Watch lecture"
+  deep-links into AryaVidya's own player, which resolves the stream with the visitor's access.
+- **Protected attachments** — notes entries return a real title and filename but an empty
+  `key`. The row shows the filename and an "Open on AryaVidya" action instead of a dead link.
+- **PDF Bank folders** — `get-child-nodes` is a POST that Cloudflare only answers for
+  same-site requests; it fails from the browser *and* from the serverless proxy. Exam and
+  category levels work, and each exam's public `.xlsx` index is offered as a download.
+- **Khazana** — browsing stops at the course cards; deeper content lives on AryaVidya.
+- **Weekly schedule** — the endpoint has not returned data for the batches tested; the UI
+  shows an empty state rather than inventing one.
 
 ## Development
 
