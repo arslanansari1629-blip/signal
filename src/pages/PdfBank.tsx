@@ -4,12 +4,18 @@ import { api, nodeUrl, type PdfExam, type PdfNode } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { Empty, ErrorBox, ListSkeleton, Modal } from '../components/ui';
 import { store } from '../lib/store';
+import { useRoute } from '../lib/router';
 
 export function PdfBank() {
   const { data, loading, error, reload } = useAsync((signal) => api.pdfBank(signal), []);
   const exams: PdfExam[] = data?.data ?? [];
   const [examIdx, setExamIdx] = useState(0);
-  const [trail, setTrail] = useState<PdfNode[]>([]);
+  const route = useRoute();
+  // Deep-linkable folders, e.g. #/pdf-bank?deeplink=/JEE/Mindmaps
+  const [trail, setTrail] = useState<PdfNode[]>(() => {
+    const link = route.query.get('deeplink');
+    return link ? [{ name: link.split('/').filter(Boolean).pop() || link, deeplink: link }] : [];
+  });
   const [pdf, setPdf] = useState<{ name: string; url: string } | null>(null);
   const deeplink = trail.length ? trail[trail.length - 1].deeplink ?? '' : '';
 

@@ -11,7 +11,7 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
   const subjectName = route.query.get('name') || 'Subject';
   const topicName = route.query.get('topic') || 'Chapter';
   const subjectId = route.query.get('sid') || '';
-  const [type, setType] = useState<'videos' | 'notes'>('videos');
+  const [type, setType] = useState<'videos' | 'notes'>(route.query.get('type') === 'notes' ? 'notes' : 'videos');
   const [page, setPage] = useState(1);
   const [pdf, setPdf] = useState<{ name: string; url: string } | null>(null);
   const { data, loading, error, reload } = useAsync(
