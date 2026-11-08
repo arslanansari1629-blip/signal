@@ -20,9 +20,13 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
   const { data, loading, error, reload } = useAsync(
     (signal) => api.contents(batchId, slug, tag, type, page, signal), [batchId, slug, tag, type, page]);
   const items: Content[] = data?.data ?? [];
-  const total = data?.paginate?.totalCount ?? items.length;
-  const limit = data?.paginate?.limit ?? 20;
-  const pages = Math.max(1, Math.ceil(total / limit));
+  // The contents endpoint sometimes reports totalCount: 0 even when it returns rows,
+  // so only trust it when it is positive; otherwise infer "more" from a full page.
+  const pg = data?.paginate;
+  const limit = pg?.limit && pg.limit > 0 ? pg.limit : 20;
+  const counted = Boolean(pg?.totalCount && pg.totalCount > 0);
+  const total = counted ? pg!.totalCount! : items.length;
+  const pages = counted ? Math.max(1, Math.ceil(total / limit)) : (items.length >= limit ? page + 1 : page);
 
   const openPdf = (name: string, url: string) => {
     setPdf({ name, url });
@@ -49,7 +53,9 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
       <div className="page-head">
         <div>
           <h1 className="page-title">{topicName}</h1>
-          <div className="page-sub">{subjectName} · {loading ? 'loading…' : `${total} ${type === 'videos' ? 'lectures' : 'notes'} · page ${page} of ${pages}`}</div>
+          <div className="page-sub">{subjectName} · {loading ? 'loading…' : counted
+            ? `${total} ${type === 'videos' ? 'lectures' : 'notes'} · page ${page} of ${pages}`
+            : `${items.length} ${type === 'videos' ? 'lectures' : 'notes'} on page ${page}`}</div>
         </div>
       </div>
 
