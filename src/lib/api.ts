@@ -11,7 +11,10 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   let body: any;
   try { body = JSON.parse(text); } catch { throw new ApiError('The server returned an unreadable response.', res.status); }
   if (!res.ok || body?.success === false) {
-    throw new ApiError(body?.error?.message || body?.message || `Request failed (${res.status})`, res.status);
+    // The upstream proxy tunnels API errors inside a 200 response, so the real
+    // status lives in the body (e.g. {success:false, code:401, error:{status:401}}).
+    const status = Number(body?.error?.status || body?.code || res.status) || res.status;
+    throw new ApiError(body?.error?.message || body?.message || `Request failed (${status})`, status);
   }
   return body as T;
 }
@@ -27,7 +30,10 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal, sim
   const text = await res.text();
   let parsed: any;
   try { parsed = JSON.parse(text); } catch { throw new ApiError('The server returned an unreadable response.', res.status); }
-  if (!res.ok || parsed?.success === false) throw new ApiError(parsed?.error?.message || `Request failed (${res.status})`, res.status);
+  if (!res.ok || parsed?.success === false) {
+    const status = Number(parsed?.error?.status || parsed?.code || res.status) || res.status;
+    throw new ApiError(parsed?.error?.message || parsed?.message || `Request failed (${status})`, status);
+  }
   return parsed as T;
 }
 

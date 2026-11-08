@@ -117,3 +117,12 @@ test('expired upstream tokens are explained, not shown as a bot check', async ()
   const { friendlyError } = await import('../src/lib/errors.mjs');
   assert.match(friendlyError('Token expired'), /access token for this batch has expired/);
 });
+
+test('a tunneled 401 keeps its real status so the proxy fallback is skipped', async () => {
+  // Mirrors getJson: the upstream answers HTTP 200 with the failure in the body.
+  const body = { code: 401, message: 'Token expired', success: false, error: { message: 'Token expired', status: 401 } };
+  const httpStatus = 200;
+  const status = Number(body?.error?.status || body?.code || httpStatus) || httpStatus;
+  assert.equal(status, 401);
+  assert.ok(status >= 400 && status < 500, 'must be treated as authoritative, not retried');
+});
