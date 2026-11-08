@@ -16,10 +16,12 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   return body as T;
 }
 
-async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+async function postJson<T>(url: string, body: unknown, signal?: AbortSignal, simple = false): Promise<T> {
   const res = await fetch(url, {
     method: 'POST', signal,
-    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    // text/plain keeps this a "simple" CORS request (no OPTIONS preflight); the
+    // upstream reads the raw JSON body either way.
+    headers: { accept: 'application/json', 'content-type': simple ? 'text/plain;charset=UTF-8' : 'application/json' },
     body: JSON.stringify(body)
   });
   const text = await res.text();
@@ -87,7 +89,7 @@ export const api = {
   pdfNodes: async (deeplink: string, signal?: AbortSignal) => {
     const path = '/student-engagement-core/private/v1/study-material/get-child-nodes';
     try {
-      return await postJson<{ data: PdfNode[] }>(directUrl(path), { deeplink }, signal);
+      return await postJson<{ data: PdfNode[] }>(directUrl(path), { deeplink }, signal, true);
     } catch (err) {
       if (signal?.aborted) throw err;
       return postJson<{ data: PdfNode[] }>(proxyUrl(path), { deeplink }, signal);
@@ -115,10 +117,10 @@ export interface Topic {
 }
 export interface Content {
   _id: string; topic: string; date?: string; startTime?: string; url?: string; urlType?: string;
-  isVideoLecture?: boolean; hasAttachment?: boolean; isLocked?: boolean; isFree?: boolean;
+  isVideoLecture?: boolean; hasAttachment?: boolean; isLocked?: boolean; isFree?: boolean; isDPPNotes?: boolean;
   teachers?: Teacher[]; tags?: { _id: string; name: string }[];
   videoDetails?: { name?: string; image?: string; duration?: string; videoUrl?: string; hls_url?: string; findKey?: string };
-  homeworkIds?: { _id?: string; topic?: string; attachmentIds?: { _id: string; name?: string; baseUrl?: string; key?: string }[] }[];
+  homeworkIds?: { _id?: string; topic?: string; note?: string; attachmentIds?: { _id: string; name?: string; baseUrl?: string; key?: string }[] }[];
 }
 export interface Announcement {
   _id: string; title?: string; announcement?: string; content?: string; createdAt?: string;
@@ -161,5 +163,9 @@ export function playerLink(batchId: string, subjectId: string, content: Content)
   return `${ORIGIN}/play.php?${params.toString()}`;
 }
 
+/** Upstream returns an empty `key` for files the visitor is not entitled to. */
 export const attachmentUrl = (a: { baseUrl?: string; key?: string }) =>
-  a.baseUrl && a.key ? `${a.baseUrl.replace(/\/$/, '')}/${a.key}` : '';
+  a.baseUrl && a.key ? `${a.baseUrl.replace(/\/$/, '')}/${a.key.replace(/^\//, '')}` : '';
+
+/** Where a visitor can open a protected attachment with their own AryaVidya access. */
+export const referenceBatchLink = (batchId: string) => `${ORIGIN}/#/batch/${batchId}`;

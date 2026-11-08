@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, PlayCircle, FileText, Download, ExternalLink, Video, Lock } from 'lucide-react';
-import { api, attachmentUrl, playerLink, teacherName, type Content } from '../lib/api';
+import { api, attachmentUrl, playerLink, referenceBatchLink, teacherName, type Content } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { useRoute } from '../lib/router';
 import { Empty, ErrorBox, ListSkeleton, Modal, fmtDate, fmtTime } from '../components/ui';
@@ -81,22 +81,37 @@ export function TopicPage({ batchId, slug, tag }: { batchId: string; slug: strin
                 <>
                   <span className="list-index"><FileText size={14} /></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="list-title">{c.topic || 'Notes'}</div>
-                    <div className="tiny muted">{fmtDate(c.date || c.startTime)}</div>
-                    <div className="row" style={{ marginTop: 8 }}>
-                      {(c.homeworkIds ?? []).flatMap((h) => h.attachmentIds ?? []).map((a) => {
-                        const url = attachmentUrl(a);
-                        if (!url) return null;
-                        const label = a.name || 'Attachment';
-                        return (
-                          <span className="row" key={a._id} style={{ gap: 6 }}>
-                            <button className="btn" onClick={() => openPdf(label, url)}><FileText /> {label.length > 28 ? `${label.slice(0, 28)}…` : label}</button>
-                            <a className="icon-btn" href={url} target="_blank" rel="noreferrer" title="Download"><Download /></a>
-                          </span>
-                        );
-                      })}
-                      {!(c.homeworkIds ?? []).some((h) => (h.attachmentIds ?? []).length > 0) && <span className="tiny muted">No attachment published for this entry.</span>}
-                    </div>
+                    {(c.homeworkIds?.length ? c.homeworkIds : [{ _id: c._id, topic: c.topic, note: '', attachmentIds: [] }]).map((h, hi) => {
+                      const atts = h.attachmentIds ?? [];
+                      const openable = atts.filter((a) => attachmentUrl(a));
+                      return (
+                        <div className="note-entry" key={h._id || hi}>
+                          <div className="list-title">{h.topic || c.topic || (c.isDPPNotes ? 'DPP' : 'Class notes')}</div>
+                          <div className="tiny muted">{h.note ? `${h.note} · ` : ''}{fmtDate(c.date || c.startTime)}</div>
+                          <div className="row" style={{ marginTop: 8 }}>
+                            {openable.map((a) => {
+                              const url = attachmentUrl(a);
+                              const label = a.name || 'Attachment';
+                              return (
+                                <span className="row" key={a._id} style={{ gap: 6 }}>
+                                  <button className="btn" onClick={() => openPdf(label, url)}><FileText /> {label.length > 28 ? `${label.slice(0, 28)}…` : label}</button>
+                                  <a className="icon-btn" href={url} target="_blank" rel="noreferrer" title="Download"><Download /></a>
+                                </span>
+                              );
+                            })}
+                            {atts.length > 0 && openable.length === 0 && (
+                              <>
+                                <span className="chip"><Lock size={11} /> {atts[0].name || 'Protected file'}</span>
+                                <a className="btn" href={referenceBatchLink(batchId)} target="_blank" rel="noreferrer">
+                                  <ExternalLink /> Open on AryaVidya
+                                </a>
+                              </>
+                            )}
+                            {atts.length === 0 && <span className="tiny muted">No attachment published for this entry.</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}
