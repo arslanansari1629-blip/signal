@@ -12,6 +12,7 @@ export const API_BASE = `${ORIGIN}/arshya`;
 export const META_KEY = 'fgsbhv235793853rifjb';
 export const CATALOG_URL = 'https://semfy-gros.github.io/batches/batcha.json';
 export const PLAYER_URL = `${ORIGIN}/play.php`;
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 /** Only these upstream path families are proxied. */
 const ALLOWED = [
@@ -50,8 +51,15 @@ export async function fetchUpstream(path, { timeout = 20000, body = null } = {})
       method: body ? 'POST' : 'GET',
       signal: controller.signal,
       headers: {
-        accept: 'application/json',
-        'user-agent': 'Mozilla/5.0 (compatible; SignalStudy/1.0)',
+        accept: 'application/json, text/plain, */*',
+        'accept-language': 'en-US,en;q=0.9',
+        referer: `${ORIGIN}/`,
+        origin: ORIGIN,
+        'user-agent': UA,
+        'x-requested-with': 'XMLHttpRequest',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-dest': 'empty',
         ...(body ? { 'content-type': 'application/json' } : {})
       },
       ...(body ? { body: JSON.stringify(body) } : {})
@@ -61,7 +69,8 @@ export async function fetchUpstream(path, { timeout = 20000, body = null } = {})
     try {
       parsed = JSON.parse(text);
     } catch {
-      throw Object.assign(new Error('Upstream returned a non-JSON response'), { status: 502 });
+      const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 180);
+      throw Object.assign(new Error(`Upstream returned a non-JSON response (HTTP ${res.status}): ${snippet}`), { status: 502 });
     }
     if (!res.ok) throw Object.assign(new Error(parsed?.error?.message || `Upstream HTTP ${res.status}`), { status: res.status });
     return parsed;
