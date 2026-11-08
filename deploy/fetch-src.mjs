@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 const REPO = process.env.SOURCE_REPO || 'arslanansari1629-blip/signal';
 // Pinned for reproducible builds; override with SOURCE_REF (branch or commit).
-const REF = process.env.SIGNAL_REF || 'cc945bcaaa80bb3bfe0a383ce07f387b7db62bf1';
+const REF = process.env.SIGNAL_REF || '2ad68ecd7a0922cf9301da12626dddeaeff1d11a';
 const ENTRIES = ['src', 'api', 'server', 'public', 'index.html', 'vite.config.ts', 'tsconfig.json'];
 
 const ref = REF.includes('/') && !REF.startsWith('refs/') ? `refs/heads/${REF}` : REF;
