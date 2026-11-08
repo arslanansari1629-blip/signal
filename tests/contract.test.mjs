@@ -45,3 +45,17 @@ test('proxy allowlist accepts known routes and rejects everything else', () => {
   const bad = ['http://evil.test/x', '/v1/users/me', '/v3/batches/xyz/details', '', null, '/v3/batches/62be8b94c1b06e00119564c8/details/../../admin'];
   for (const p of bad) assert.ok(!isAllowedPath(p), String(p));
 });
+
+test('browser encoder matches the server encoder', async () => {
+  // Mirror of src/lib/upstream.ts using Web APIs available in Node 22.
+  const KEY = 'fgsbhv235793853rifjb';
+  const browserEncode = (path) => {
+    const bytes = new TextEncoder().encode(path);
+    const out = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) out[i] = bytes[i] ^ KEY.charCodeAt(i % KEY.length);
+    let binary = '';
+    for (const byte of out) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  };
+  for (const [path, meta] of SAMPLES) assert.equal(browserEncode(path), meta);
+});

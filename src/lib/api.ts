@@ -1,4 +1,4 @@
-const ORIGIN = 'https://stream.aryavidya.cc';
+import { ORIGIN, directUrl, proxyUrl } from './upstream';
 
 export class ApiError extends Error {
   status: number;
@@ -29,9 +29,17 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Pr
   return parsed as T;
 }
 
-/** Every call is forwarded to stream.aryavidya.cc by our serverless proxy. */
-export function pw<T>(path: string, signal?: AbortSignal): Promise<T> {
-  return getJson<T>(`/api/proxy?path=${encodeURIComponent(path)}`, signal);
+/**
+ * Reads go straight from the visitor's browser to the upstream API (it allows CORS).
+ * If that is blocked by the network, we retry once through our own serverless proxy.
+ */
+export async function pw<T>(path: string, signal?: AbortSignal): Promise<T> {
+  try {
+    return await getJson<T>(directUrl(path), signal);
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    return getJson<T>(proxyUrl(path), signal);
+  }
 }
 
 export interface CatalogBatch {
@@ -42,7 +50,17 @@ export interface CatalogBatch {
 export interface Catalog { generated_at: string | null; batches: CatalogBatch[] }
 
 export const api = {
-  catalog: (signal?: AbortSignal) => getJson<Catalog>('/api/catalog', signal),
+  catalog: async (signal?: AbortSignal) => {
+    try {
+      return await getJson<Catalog>('/api/catalog', signal);
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      // Same catalog the reference dashboard loads; GitHub Pages allows CORS.
+      const raw = await getJson<any>(`https://semfy-gros.github.io/batches/batcha.json?v=${Date.now()}`, signal);
+      const batches = Array.isArray(raw) ? raw : raw.batches ?? raw.data ?? [];
+      return { generated_at: raw.generated_at ?? null, batches: batches.filter((b: any) => b?.batch_id) } as Catalog;
+    }
+  },
   batch: (id: string, signal?: AbortSignal) => pw<{ data: BatchDetails }>(`/v3/batches/${id}/details`, signal),
   topics: (batchId: string, slug: string, page = 1, signal?: AbortSignal) =>
     pw<{ data: Topic[]; paginate?: Paginate }>(`/v2/batches/${batchId}/subject/${slug}/topics?page=${page}`, signal),
@@ -66,10 +84,15 @@ export const api = {
     pw<{ data: Topic[] }>(`/v2/programs/${programId}/subjects/${subjectId}/chapters/list?page=${page}`, signal),
   pdfBank: (signal?: AbortSignal) =>
     pw<{ data: PdfExam[] }>(`/student-engagement-core/private/v1/study-material/exams-with-categories?page=1&limit=100`, signal),
-  pdfNodes: (deeplink: string, signal?: AbortSignal) =>
-    postJson<{ data: PdfNode[] }>(
-      `/api/proxy?path=${encodeURIComponent('/student-engagement-core/private/v1/study-material/get-child-nodes')}`,
-      { deeplink }, signal)
+  pdfNodes: async (deeplink: string, signal?: AbortSignal) => {
+    const path = '/student-engagement-core/private/v1/study-material/get-child-nodes';
+    try {
+      return await postJson<{ data: PdfNode[] }>(directUrl(path), { deeplink }, signal);
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      return postJson<{ data: PdfNode[] }>(proxyUrl(path), { deeplink }, signal);
+    }
+  }
 };
 
 export interface Paginate { limit?: number; totalCount?: number; totalPages?: number; videosCount?: number }

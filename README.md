@@ -15,8 +15,13 @@ GET https://stream.aryavidya.cc/arshya/index.php?type=contents&metaData=<payload
 payload = base64( xor(utf8(apiPath), key) )      # 20-byte repeating key
 ```
 
-`server/upstream.mjs` implements that codec (verified byte-for-byte against payloads
-captured from the live client) and exposes it only through an allow-listed proxy:
+`src/lib/upstream.ts` (browser) and `server/upstream.mjs` (Node) both implement that
+codec, verified byte-for-byte against payloads captured from the live client.
+
+**Requests go browser → upstream.** The API returns `access-control-allow-origin: *`,
+and its CDN serves a bot challenge to datacenter IPs, so calling it from the visitor's
+own browser is both faster and more reliable. If a network blocks that, the client
+retries once through the allow-listed serverless proxy below:
 
 | Route | Purpose |
 | --- | --- |
@@ -51,8 +56,9 @@ npm test         # codec + allow-list contract tests
 npm run build    # type-check + production bundle
 ```
 
-> The Arena sandbox blocks outbound traffic to `stream.aryavidya.cc`, so API panels show
-> a clear error there. The deployed Vercel app has full network access and renders live data.
+> Data is fetched by the browser, so `npm run dev` shows live content even inside the
+> Arena sandbox (whose *server* egress is restricted). The server-side proxy routes are
+> the fallback path and need unrestricted egress to work.
 
 ## Deployment
 
