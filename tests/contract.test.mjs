@@ -59,3 +59,14 @@ test('browser encoder matches the server encoder', async () => {
   };
   for (const [path, meta] of SAMPLES) assert.equal(browserEncode(path), meta);
 });
+
+test('upstream HTML error pages become one readable line', async () => {
+  const { friendlyError } = await import('../src/lib/errors.mjs');
+  const cloudflare = '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title></head><body>cf</body></html>';
+  assert.match(friendlyError(cloudflare), /bot protection/);
+  assert.ok(!friendlyError(cloudflare).includes('<'));
+  assert.equal(friendlyError('Batch not found'), 'Batch not found');
+  assert.equal(friendlyError('  <b>Too   many</b>\n requests '), 'Too many requests');
+  assert.equal(friendlyError(''), 'Something went wrong.');
+  assert.ok(friendlyError('x'.repeat(500)).length <= 240);
+});

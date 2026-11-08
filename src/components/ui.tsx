@@ -1,4 +1,4 @@
-import { stripHtml } from '../lib/sanitize';
+import { friendlyError } from '../lib/errors.mjs';
 import type { ReactNode } from 'react';
 import { AlertTriangle, Inbox, X } from 'lucide-react';
 
@@ -41,11 +41,7 @@ export function Empty({ title, hint, icon }: { title: string; hint?: string; ico
 }
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  // Upstream sometimes answers with a bot-check HTML page; show a readable line, not markup.
-  const looksLikeHtml = /<!doctype|<html|<head/i.test(message);
-  const text = looksLikeHtml
-    ? 'AryaVidya blocked this request (bot protection). This content can only be opened on AryaVidya itself.'
-    : stripHtml(message).slice(0, 240);
+  const text = friendlyError(message);
   return (
     <div className="card error-box">
       <AlertTriangle />
