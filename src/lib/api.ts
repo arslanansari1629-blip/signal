@@ -41,7 +41,25 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal, sim
  * Reads go straight from the visitor's browser to the upstream API (it allows CORS).
  * If that is blocked by the network, we retry once through our own serverless proxy.
  */
+/** Bound a request so a dead fallback can never leave the UI spinning. */
+function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, ms: number, outer?: AbortSignal): Promise<T> {
+  const ctl = new AbortController();
+  const onAbort = () => ctl.abort();
+  outer?.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(() => ctl.abort(), ms);
+  return run(ctl.signal).finally(() => {
+    clearTimeout(timer);
+    outer?.removeEventListener('abort', onAbort);
+  });
+}
+
+const unreachable = () => new ApiError(
+  "This browser could not read AryaVidya's response. The batch may be unavailable, its access token may have expired, or the network blocked the request.",
+  502
+);
+
 export async function pw<T>(path: string, signal?: AbortSignal): Promise<T> {
+  let firstError: unknown;
   try {
     return await getJson<T>(directUrl(path), signal);
   } catch (err) {
@@ -49,7 +67,15 @@ export async function pw<T>(path: string, signal?: AbortSignal): Promise<T> {
     // A 4xx is a real answer from upstream (e.g. 401 "Token expired"). Retrying it
     // through our proxy only replaces that useful message with a bot-check page.
     if (err instanceof ApiError && err.status >= 400 && err.status < 500) throw err;
-    return getJson<T>(proxyUrl(path), signal);
+    firstError = err;
+  }
+  try {
+    // The proxy is blocked by Cloudflare on most hosts; give it a short leash.
+    return await withTimeout((sig) => getJson<T>(proxyUrl(path), sig), 6000, signal);
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    // Keep the upstream explanation — it is far more useful than the proxy's.
+    throw firstError instanceof ApiError ? firstError : unreachable();
   }
 }
 
