@@ -57,14 +57,14 @@ export async function fetchUpstream(path, { timeout = 20000, body = null } = {})
       ...(body ? { body: JSON.stringify(body) } : {})
     });
     const text = await res.text();
-    let body;
+    let parsed;
     try {
-      body = JSON.parse(text);
+      parsed = JSON.parse(text);
     } catch {
       throw Object.assign(new Error('Upstream returned a non-JSON response'), { status: 502 });
     }
-    if (!res.ok) throw Object.assign(new Error(body?.error?.message || `Upstream HTTP ${res.status}`), { status: res.status });
-    return body;
+    if (!res.ok) throw Object.assign(new Error(parsed?.error?.message || `Upstream HTTP ${res.status}`), { status: res.status });
+    return parsed;
   } catch (err) {
     if (err?.name === 'AbortError') throw Object.assign(new Error('The upstream API timed out. Please retry.'), { status: 504 });
     if (err?.message === 'fetch failed' || err?.code === 'ENOTFOUND' || err?.code === 'ECONNREFUSED') {
