@@ -12,10 +12,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const REPO = process.env.SOURCE_REPO || 'arslanansari1629-blip/signal';
-const REF = process.env.SOURCE_REF || 'arena/4daa0992-signal';
+// Pinned for reproducible builds; override with SOURCE_REF (branch or commit).
+const REF = process.env.SOURCE_REF || 'b8426eba18f023327a46406ab82fd479034b8634';
 const ENTRIES = ['src', 'api', 'server', 'public', 'index.html', 'vite.config.ts', 'tsconfig.json'];
 
-const url = `https://codeload.github.com/${REPO}/tar.gz/refs/heads/${REF}`;
+const ref = REF.includes('/') && !REF.startsWith('refs/') ? `refs/heads/${REF}` : REF;
+const url = `https://codeload.github.com/${REPO}/tar.gz/${ref}`;
 console.log(`[bootstrap] fetching ${url}`);
 const work = mkdtempSync(join(tmpdir(), 'signal-src-'));
 const archive = join(work, 'source.tgz');
